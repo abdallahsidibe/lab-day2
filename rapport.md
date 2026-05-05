@@ -42,7 +42,7 @@ Notre endpoint `/health` actuel est un "Fat Healthcheck" qui vérifie à la fois
 - `/health/live` : Réponse 200 immédiate (le processus tourne).
 - `/health/ready` : Vérification des dépendances (connexion aux autres services/DB).
 
-![Healthcheck Agrégé](images/HealthcheckagrégéGateway.png)
+![Healthcheck Agrégé](images/healthcheck_gateway.png)
 
 ---
 
@@ -84,7 +84,7 @@ L'un des points forts de ce TP est l'implémentation de métriques "Zero-Depende
 ![Dashboard Grafana](images/dashboardgrafana.png)
 
 Le succès des tests automatisés confirme la robustesse de l'implémentation :
-![Tests Success](images/testsautomatiséstest.sh.png)
+![Tests Success](images/tests_results.png)
 
 ---
 

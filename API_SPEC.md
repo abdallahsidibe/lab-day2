@@ -112,7 +112,7 @@ Format de réponse unifié pour tous les services :
 }
 ```
 
-![Healthcheck agrégé Gateway](images/HealthcheckagrégéGateway.png)
+![Healthcheck agrégé Gateway](images/healthcheck_gateway.png)
 
 ### `GET /metrics`
 Exposition brute au format Prometheus :

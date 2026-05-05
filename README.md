@@ -60,7 +60,7 @@ Le projet inclut une suite de 46 tests d'intégration couvrant 100% des spécifi
 ./test.sh
 ```
 
-![Résultat des tests](images/testsautomatiséstest.sh.png)
+![Résultat des tests](images/tests_results.png)
 
 ---
 
@@ -122,9 +122,9 @@ curl http://localhost:3001/metrics # Catalogue
 curl http://localhost:3003/metrics # Commandes
 ```
 
-![Métriques Prometheus Catalogue](images/MétriquesPrometheusCatalogue.png)
+![Métriques Prometheus Catalogue](images/metrics_prometheus_catalogue.png)
 
-![Santé des services dans Prometheus](images/promotheusonpeuxvoirquelesservicessonttoutensanteetrépondentbienleslogpeuventaussietrevusdanslefichiermetric_output.log.png)
+![Santé des services dans Prometheus](images/prometheus_services_health.png)
 
 ### Dashboard Grafana
 Visualisation globale de l'état du système.
