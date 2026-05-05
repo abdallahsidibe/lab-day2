@@ -1,0 +1,91 @@
+services:
+  gateway:
+    build: ./gateway
+    ports:
+      - "3005:3000"
+    environment:
+      - PORT=3000
+      - SERVICE_NAME=gateway
+      - CATALOGUE_URL=http://catalogue:3001
+      - PANIER_URL=http://panier:3002
+      - COMMANDES_URL=http://commandes:3003
+      - NOTIFICATIONS_URL=http://notifications:3004
+    depends_on:
+      - catalogue
+      - panier
+      - commandes
+      - notifications
+    networks:
+      - e-commerce-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  catalogue:
+    build: ./catalogue
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - SERVICE_NAME=catalogue
+    networks:
+      - e-commerce-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  panier:
+    build: ./panier
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - SERVICE_NAME=panier
+    networks:
+      - e-commerce-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  commandes:
+    build: ./commandes
+    ports:
+      - "3003:3003"
+    environment:
+      - PORT=3003
+      - SERVICE_NAME=commandes
+      - NOTIFICATIONS_URL=http://notifications:3004
+    depends_on:
+      - notifications
+    networks:
+      - e-commerce-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  notifications:
+    build: ./notifications
+    ports:
+      - "3004:3004"
+    environment:
+      - PORT=3004
+      - SERVICE_NAME=notifications
+    networks:
+      - e-commerce-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  e-commerce-net:
+    driver: bridge
