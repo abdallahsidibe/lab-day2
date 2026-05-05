@@ -21,14 +21,14 @@ La plateforme est composée de 5 services isolés communiquant via un réseau vi
 
 ```mermaid
 graph TD
-    Client((💻 User/Test)) -->|HTTP :3005| Gateway[<b>API Gateway</b><br/><i>Entry Point</i>]
+    Client((💻 User/Test)) -->|HTTP :3005| Gateway[<b>API Gateway</b><br/><i>Port: 3000</i>]
     
-    subgraph "Internal Docker Network"
-        Gateway -->|Routing| Catalogue[<b>Catalogue</b><br/><i>Products & Stock</i>]
-        Gateway -->|Routing| Panier[<b>Panier</b><br/><i>User Carts</i>]
-        Gateway -->|Routing| Commandes[<b>Commandes</b><br/><i>Checkout Logic</i>]
+    subgraph "Internal Docker Network (e-commerce-net)"
+        Gateway -->|Routing| Catalogue[<b>Catalogue</b><br/><i>Port: 3001</i>]
+        Gateway -->|Routing| Panier[<b>Panier</b><br/><i>Port: 3002</i>]
+        Gateway -->|Routing| Commandes[<b>Commandes</b><br/><i>Port: 3003</i>]
         
-        Commandes -.->|Async Notify| Notifications[<b>Notifications</b><br/><i>Email Sim</i>]
+        Commandes -.->|Async Notify| Notifications[<b>Notifications</b><br/><i>Port: 3004</i>]
     end
     
     %% Styling
