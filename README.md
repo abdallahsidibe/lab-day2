@@ -133,6 +133,13 @@ curl http://localhost:3003/metrics # Commandes
 
 ![Santé des services dans Prometheus](images/prometheus_services_health.png)
 
+#### Métriques Métier Personnalisées
+En plus des métriques techniques, nous suivons des indicateurs métier spécifiques :
+
+| Commandes | Panier |
+| :---: | :---: |
+| ![Métriques Commandes](images/exempledemetricpersopourlacommande.png) | ![Métriques Panier](images/exempledemetricpersopourlepanieronacheckpanier_request_total.png) |
+
 ### Dashboard Grafana
 Visualisation globale de l'état du système.
 
