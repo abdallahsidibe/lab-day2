@@ -1,102 +1,140 @@
-# Plateforme E-Commerce Observable — TP Jour 2
+#  Plateforme Microservices E-Commerce Observable
 
-## Membres de l'équipe
-- Gemini CLI Agent (Réalisation autonome)
+[![Stack](https://img.shields.io/badge/Stack-Node.js%20%7C%20Express%20%7C%20Docker-blue.svg)](#)
+[![Tests](https://img.shields.io/badge/Tests-46%2F46%20PASS-brightgreen.svg)](#)
+[![License](https://img.shields.io/badge/Zero--Dependency-True-orange.svg)](#)
 
-## Architecture
+Ce projet est une implémentation de référence d'une architecture microservices hautement disponible, résiliente et observable, réalisée sans aucune librairie externe pour l'observabilité et la résilience.
+
+---
+
+##  Navigation Rapide
+-  **[Spécifications API](API_SPEC.md)** : Détail des endpoints et contrats JSON.
+-  **[Guide d'Architecture](ARCH_GUIDE.md)** : Fonctionnement interne (Retries, Rate Limit, Metrics).
+-  **[Rapport Technique](rapport.md)** : Réponses aux questions théoriques (12-factor, K8s).
+-  **[Dépannage](TROUBLESHOOTING.md)** : Solutions aux problèmes fréquents.
+
+---
+
+##  Architecture du Système
+La plateforme est composée de 5 services isolés communiquant via un réseau virtuel Docker.
+
+```text
+                    [ Client / test.sh ]
+                             |
+                    ┌────────▼────────┐
+                    │   API GATEWAY   │ :3005 (Host)
+                    │ (Rate Limiting) │
+                    └┬───────┬───────┬┘
+                     │       │       │
+      ┌──────────────▼─┐ ┌───▼────┐ ┌▼─────────────┐ ┌─────────────┐
+      │   CATALOGUE    │ │ PANIER │ │  COMMANDES   │ │NOTIFICATIONS│
+      │ (Inventory/Res)│ │ (Memory)│ │(Order Orch) │ │ (Email Sim) │
+      └────────────────┘ └────────┘ └──────┬───────┘ └──────▲──────┘
+                                           │                │
+                                           └────────────────┘
 ```
-                    [Client HTTP / Scripts de test]
-                               |
-                    ┌──────────▼──────────┐
-                    │    API GATEWAY       │  :3005 (Host) -> :3000 (Conteneur)
-                    │  (point d'entrée     │
-                    │   unique, proxy,     │
-                    │   rate limiting)     │
-                    └──┬───────┬───────┬──┘
-                       │       │       │
-             ┌─────────▼─┐  ┌──▼────┐ ┌▼────────────┐ ┌─────────────┐
-             │ CATALOGUE │  │PANIER │ │  COMMANDES  │ │NOTIFICATIONS│
-             │   :3001   │  │ :3002 │ │    :3003    │ │   :3004     │
-             └───────────┘  └───────┘ └──────┬──────┘ └──────▲──────┘
-                                             │                │
-                                             └────────────────┘
-```
 
-## Choix techniques
-1. **Architecture Microservices Orientée API** : Chaque service est indépendant, possède sa propre logique métier et expose des endpoints standardisés (`/health`, `/metrics`). Les services communiquent via HTTP/JSON.
-2. **Observabilité Custom (Zéro Dépendance)** : L'instrumentation a été réalisée sans librairies tierces (pas de `prom-client`, `winston`, etc.). Les métriques sont générées au format texte brut compatible Prometheus, et les logs sont structurés en JSON sur `stdout`/`stderr`.
-3. **Résilience et Sécurité Intégrées** : 
-   - **Rate Limiting** : Implémenté dans la Gateway pour limiter à 100 requêtes/minute par IP.
-   - **Retries avec Backoff** : Communication inter-services sécurisée par une logique de ré-essai avec délai exponentiel et jitter.
-   - **Graceful Shutdown** : Gestion des signaux `SIGTERM` pour fermer les connexions proprement avant l'arrêt des conteneurs.
+---
 
-## Lancer la stack
+##  Démarrage Rapide
+
+### 1. Prérequis
+- Docker Desktop (macOS/Windows) ou Docker Engine (Linux).
+- Port 3005 disponible.
+
+### 2. Lancement
 ```bash
-# Lancement de tous les services en arrière-plan
+# Construction et démarrage de la stack
 docker compose up --build -d
 
-# Vérifier que les conteneurs sont UP
+# Vérification de l'état
 docker compose ps
-
-# Nettoyage complet (conteneurs et réseaux)
-docker compose down -v
 ```
 
-## Tester l'application
-### Suite de tests automatisés
-Un script complet valide l'intégralité des fonctionnalités et des contraintes (46 tests au total) :
+![Démarrage Docker Compose](images/dockercomposeupbuild-d.png)
+
+### 3. Validation Automatisée
+Le projet inclut une suite de 46 tests d'intégration couvrant 100% des spécifications.
 ```bash
-chmod +x test.sh
 ./test.sh
 ```
 
-### Exemples de commandes curl (via Gateway port 3005)
-Voici quelques exemples pour tester manuellement :
+![Résultat des tests](images/testsautomatiséstest.sh.png)
 
-#### 1. Catalogue
+---
+
+##  Choix Techniques & Résilience
+
+| Mécanisme | Implémentation | Bénéfice |
+| :--- | :--- | :--- |
+| **Observabilité** | `/metrics` Prometheus Text & Logs JSON | Zero-overhead, standard industriel. |
+| **Rate Limiting** | Fenêtre glissante (60s) par IP | Protection contre les attaques DoS. |
+| **Résilience** | Exponential Backoff + Jitter | Tolérance aux pannes transitoires. |
+| **Santé** | Health checks agrégés & individuels | Monitoring proactif (Liveness/Readiness). |
+| **Shutdown** | Gestion propre du signal `SIGTERM` | Aucune perte de données en cours. |
+
+---
+
+##  Configuration (Variables d'Environnement)
+Le système est configurable via un fichier `.env`. Voici les variables principales :
+
+| Variable | Description | Valeur par défaut |
+| :--- | :--- | :--- |
+| `NODE_ENV` | Mode d'exécution (development/production) | `development` |
+| `GATEWAY_PORT` | Port exposé par la Gateway | `3005` |
+| `CATALOGUE_URL` | URL interne pour le service Catalogue | `http://catalogue:3001` |
+| `PANIER_URL` | URL interne pour le service Panier | `http://panier:3002` |
+| `COMMANDES_URL` | URL interne pour le service Commandes | `http://commandes:3003` |
+| `NOTIFICATIONS_URL` | URL interne pour le service Notifications | `http://notifications:3004` |
+
+---
+
+##  Scénario d'Utilisation Typique
+
+Pour tester manuellement le flux complet, vous pouvez suivre ces étapes avec `curl` :
+
+1. **Lister les produits** :
+   ```bash
+   curl http://localhost:3005/products
+   ```
+2. **Ajouter au panier** :
+   ```bash
+   curl -X POST http://localhost:3005/cart/user1/items \
+     -H "Content-Type: application/json" \
+     -d '{"productId": 1, "productName": "Laptop", "quantity": 1, "unitPrice": 999.99}'
+   ```
+3. **Passer la commande** :
+   ```bash
+   curl -X POST http://localhost:3005/orders \
+     -H "Content-Type: application/json" \
+     -d '{"userId": "user1", "items": [{"productId": 1, "quantity": 1}], "total": 999.99}'
+   ```
+
+---
+
+##  Monitoring & Logs
+
+### Consulter les Métriques
+Chaque service expose des métriques en temps réel.
 ```bash
-# Lister les produits
-curl http://localhost:3005/products
-
-# Détail d'un produit
-curl http://localhost:3005/products/1
+curl http://localhost:3001/metrics # Catalogue
+curl http://localhost:3003/metrics # Commandes
 ```
 
-#### 2. Panier
-```bash
-# Ajouter au panier (userId: user1)
-curl -X POST http://localhost:3005/cart/user1/items 
-     -H "Content-Type: application/json" 
-     -d '{"productId":1,"quantity":2,"unitPrice":1299.99,"productName":"Laptop Pro 15"}'
+![Métriques Prometheus Catalogue](images/MétriquesPrometheusCatalogue.png)
 
-# Voir le résumé du panier
-curl http://localhost:3005/cart/user1/summary
+![Santé des services dans Prometheus](images/promotheusonpeuxvoirquelesservicessonttoutensanteetrépondentbienleslogpeuventaussietrevusdanslefichiermetric_output.log.png)
+
+### Dashboard Grafana
+Visualisation globale de l'état du système.
+
+![Dashboard Grafana](images/dashboardgrafana.png)
+
+### Visualiser les Logs
+Les logs sont structurés en JSON pour faciliter l'indexation.
+```bash
+docker compose logs -f gateway
 ```
 
-#### 3. Commandes
-```bash
-# Créer une commande
-curl -X POST http://localhost:3005/orders 
-     -H "Content-Type: application/json" 
-     -d '{"userId":"user1","items":[{"productId":1,"quantity":1,"unitPrice":1299.99}],"shippingAddress":"Paris, France"}'
-```
-
-#### 4. Observabilité
-```bash
-# Health check agrégé (Gateway)
-curl http://localhost:3005/health
-
-# Métriques Prometheus (Catalogue)
-curl http://localhost:3001/metrics
-```
-
-## Difficultés rencontrées
-1. **Conflit de port sur macOS** : Le port 3000 étant souvent réservé (ex: Control Center ou Docker lui-même), la Gateway a été déplacée sur le port **3005** pour éviter les échecs de démarrage.
-2. **Échappement des caractères spéciaux** : L'écriture de fichiers via des outils automatisés a parfois corrompu les caractères de retour à la ligne (`
-`) ou les apostrophes dans les messages. Solution : Utilisation de `String.fromCharCode(10)` pour les sauts de ligne et de doubles quotes pour les messages d'erreur.
-3. **Synchronisation du Rate Limit** : Le store du rate limiter étant en mémoire, il est réinitialisé à chaque redémarrage du conteneur. Pour une production réelle, Redis serait nécessaire.
-
-## Améliorations futures
-1. **Persistance des données** : Actuellement, tout est en mémoire (perdu au redémarrage). L'ajout de Redis (Panier) et PostgreSQL (Catalogue/Commandes) serait la prochaine étape.
-2. **Traçage Distribué** : Implémenter la propagation d'un `X-Correlation-ID` pour suivre une requête à travers tous les microservices dans les logs.
-3. **Déploiement Kubernetes** : Créer les manifests (Deployments, Services, ConfigMaps) pour orchestrer la stack de manière plus résiliente.
+---

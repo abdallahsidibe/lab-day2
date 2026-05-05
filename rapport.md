@@ -1,33 +1,92 @@
-# Rapport Technique — TP Plateforme E-Commerce Observable
+# 📄 Rapport Technique — TP Plateforme E-Commerce Observable
 
-## Q1. Méthodologie 12-Factor App
-1. **Codebase** : Respecté. Un seul dépôt Git pour tous les microservices.
-2. **Dependencies** : Respecté. Les dépendances sont explicitement déclarées dans `package.json` et isolées via Docker.
-3. **Config** : Respecté. Utilisation de variables d'environnement (`PORT`, `URLS_SERVICES`) pour configurer les applications.
-4. **Backing Services** : Respecté. Les services sont traités comme des ressources attachées (bien que simulées en mémoire ici).
-5. **Build, Release, Run** : Respecté. Docker sépare clairement ces phases (Dockerfile build stage vs run stage).
-6. **Processes** : Respecté. Les services sont stateless et s'exécutent comme des processus isolés.
-7. **Port Binding** : Respecté. Chaque service expose son propre port (3000-3004).
-8. **Concurrency** : Respecté. Chaque service peut être scalé indépendamment via Docker Compose.
-9. **Disposability** : Respecté. Graceful shutdown implémenté (gestion de SIGTERM) pour un arrêt propre.
-10. **Dev/Prod Parity** : Respecté. Environnement identique grâce à la conteneurisation.
-11. **Logs** : Respecté. Les logs sont envoyés sur `stdout` au format JSON, traités comme un flux d'événements.
-12. **Admin Processes** : Respecté. Des routes spécifiques (ex: `DELETE /notifications`) permettent des tâches d'administration.
+## 📑 Sommaire
+1. [Méthodologie 12-Factor App](#1-méthodologie-12-factor-app)
+2. [Health Checks & Cycle de vie Kubernetes](#2-health-checks--cycle-de-vie-kubernetes)
+3. [Gestion des Logs en environnement Conteneurisé](#3-gestion-des-logs-en-environnement-conteneurisé)
+4. [Problématique de la Mise à l'Échelle (Rate Limiting)](#4-problématique-de-la-mise-à-léchelle-rate-limiting)
+5. [Garantie de Délivrance et Patterns de Messagerie](#5-garantie-de-délivrance-et-patterns-de-messagerie)
+6. [Mise en œuvre de l'Observabilité](#6-mise-en-œuvre-de-lobservabilité)
+7. [Conclusion](#7-conclusion)
 
-## Q2. Health Checks Kubernetes
-- **LivenessProbe** : Vérifie si le conteneur est toujours en vie. S'il échoue, K8s redémarre le conteneur.
-- **ReadinessProbe** : Vérifie si le conteneur est prêt à recevoir du trafic. S'il échoue, K8s retire le conteneur du Service (load balancer).
-- **Correspondance** : Notre endpoint `/health` actuel mélange les deux. Il vérifie la mémoire (liveness) et la disponibilité des données (readiness).
-- **Adaptation** : Créer `/health/live` (retourne 200 tant que le processus tourne) et `/health/ready` (vérifie les connexions aux DBs ou aux services dépendants).
+---
 
-## Q3. Logs sur stdout vs fichiers
-- **Pourquoi stdout ?** Dans Docker, les conteneurs sont éphémères. Écrire dans un fichier à l'intérieur du conteneur consomme de l'espace disque et les logs sont perdus à la suppression. `stdout` permet au moteur Docker (ou à un collecteur comme Fluentd) de capturer les logs et de les centraliser sans modifier l'application.
-- **docker-compose down** : Les logs stockés dans le moteur Docker pour ces conteneurs sont supprimés. Si on n'a pas de système de centralisation (ELK, Loki), ils sont perdus définitivement.
+## 1. Méthodologie 12-Factor App
+L'architecture a été conçue pour respecter les principes du manifeste **12-Factor**, garantissant portabilité et scalabilité.
 
-## Q4. Rate Limiting Multi-Replica
-- **Problème** : Avec 3 réplicas, chaque Gateway a son propre `store` en mémoire. Une IP pourrait faire 100 requêtes *sur chaque réplica*, soit 300 requêtes au total, contournant la limite globale.
-- **Solution** : Utiliser un store de données partagé et centralisé, comme **Redis**. Toutes les instances de la Gateway consulteraient le même compteur incrémentiel dans Redis via une opération atomique (INCR + EXPIRE).
+| Facteur | Statut | Implémentation |
+| :--- | :--- | :--- |
+| **1. Codebase** | ✅ | Un seul dépôt Git pour tous les microservices. |
+| **2. Dependencies** | ✅ | Déclaration explicite dans `package.json`, isolation via Docker. |
+| **3. Config** | ✅ | Configuration par variables d'environnement (`.env`). |
+| **4. Backing Services** | ✅ | Services traités comme ressources attachées (URLs configurables). |
+| **5. Build, Release, Run** | ✅ | Séparation stricte via les étapes de build Docker. |
+| **6. Processes** | ✅ | Services stateless, exécution comme processus isolés. |
+| **7. Port Binding** | ✅ | Chaque service expose son propre port via HTTP. |
+| **8. Concurrency** | ✅ | Scaling horizontal possible via Docker Compose réplicas. |
+| **9. Disposability** | ✅ | Gestion du signal `SIGTERM` pour un arrêt propre. |
+| **10. Dev/Prod Parity** | ✅ | Environnements identiques grâce aux conteneurs. |
+| **11. Logs** | ✅ | Flux d'événements sur `stdout` au format JSON. |
+| **12. Admin Processes** | ✅ | Tâches d'administration via endpoints dédiés (ex: purge). |
 
-## Q5. Garantie d'envoi de notification (At-Least-Once)
-1. **Message Broker (RabbitMQ/Kafka)** : Au lieu d'appeler HTTP directement, le service Commandes publie un message dans une file d'attente. Le service Notifications consomme ce message quand il est disponible. Si Notifications est down, le message reste dans la file.
-2. **Outbox Pattern** : Enregistrer la notification dans la base de données du service Commandes dans la même transaction que la commande (statut `to_send`). Un processus séparé (worker) lit périodiquement cette table et tente d'envoyer les notifications, ne les marquant comme `sent` qu'après succès HTTP.
+---
+
+## 2. Health Checks & Cycle de vie Kubernetes
+Dans une orchestration Kubernetes, la distinction entre les sondes est cruciale :
+
+- **LivenessProbe** : Détermine si le conteneur a besoin d'être redémarré (ex: deadlock).
+- **ReadinessProbe** : Détermine si le conteneur est prêt à accepter du trafic. S'il échoue, il est retiré du Load Balancer.
+
+**Observation sur notre implémentation :**
+Notre endpoint `/health` actuel est un "Fat Healthcheck" qui vérifie à la fois la mémoire et la disponibilité des données. Pour K8s, nous devrions le scinder :
+- `/health/live` : Réponse 200 immédiate (le processus tourne).
+- `/health/ready` : Vérification des dépendances (connexion aux autres services/DB).
+
+![Healthcheck Agrégé](images/HealthcheckagrégéGateway.png)
+
+---
+
+## 3. Gestion des Logs en environnement Conteneurisé
+L'écriture des logs sur `stdout` est une recommandation forte de la "Cloud Native Computing Foundation" (CNCF).
+
+**Pourquoi stdout vs fichiers ?**
+1. **Éphémérité** : Les fichiers dans un conteneur disparaissent à sa suppression.
+2. **Standardisation** : Permet au moteur de conteneur (Docker/K8s) de gérer la rotation et l'acheminement vers des collecteurs (Splunk, ELK, Loki) sans logique applicative complexe.
+
+**Risque identifié** : Lors d'un `docker compose down`, les logs non collectés par un agent externe sont perdus définitivement car le cycle de vie du log est lié à celui du conteneur.
+
+---
+
+## 4. Problématique de la Mise à l'Échelle (Rate Limiting)
+**Défi** : Notre Rate Limiter actuel stocke les compteurs en mémoire locale. 
+**Scénario** : Avec 3 réplicas de la Gateway, une IP limitée à 100 req/min pourrait en réalité effectuer 300 requêtes (100 sur chaque instance).
+
+**Solution préconisée** : L'utilisation d'un **store distribué (Redis)**. 
+- Les instances de Gateway partagent un état commun.
+- Utilisation de scripts Lua ou de commandes atomiques (`INCR`) pour éviter les "race conditions".
+
+---
+
+## 5. Garantie de Délivrance et Patterns de Messagerie
+Pour garantir l'envoi d'une notification (At-Least-Once delivery), deux approches majeures sont envisageables :
+
+1. **Message Broker (Asynchronisme)** : Utiliser RabbitMQ ou Kafka. Le service Commandes publie un message. Si le service Notifications est indisponible, le message attend dans la file d'attente.
+2. **Transactional Outbox Pattern** : Enregistrer la notification en base de données dans la même transaction que la commande. Un worker séparé tente l'envoi tant qu'il ne reçoit pas un ACK du service de notification.
+
+---
+
+## 6. Mise en œuvre de l'Observabilité
+L'un des points forts de ce TP est l'implémentation de métriques "Zero-Dependency".
+
+- **Prometheus** : Collecte les métriques exposées sur `/metrics`.
+- **Grafana** : Permet la visualisation de la santé globale.
+
+![Dashboard Grafana](images/dashboardgrafana.png)
+
+Le succès des tests automatisés confirme la robustesse de l'implémentation :
+![Tests Success](images/testsautomatiséstest.sh.png)
+
+---
+
+## 7. Conclusion
+Ce projet démontre qu'il est possible de construire une architecture microservices résiliente et observable en utilisant les standards du web (HTTP, JSON, Prometheus Text Format) sans dépendre de librairies lourdes. Le respect des **12 Factors** et la mise en place de stratégies de **Retry** et de **Rate Limiting** assurent une base solide pour une mise en production réelle.
