@@ -3,10 +3,15 @@
 ## 1. Stratégie de Résilience (Communication Inter-services)
 Nous utilisons le pattern **Retry with Jitter** pour tous les appels `Gateway -> Services` et `Orders -> Notifications`.
 
-```text
-Tentative 1 ---(Error)--> Delay 200ms + Jitter
-Tentative 2 ---(Error)--> Delay 400ms + Jitter
-Tentative 3 ---(Error)--> Fail (Propagate to Client)
+```mermaid
+graph LR
+    T1[Tentative 1] -- Error --> D1[Delay 200ms + Jitter]
+    D1 --> T2[Tentative 2]
+    T2 -- Error --> D2[Delay 400ms + Jitter]
+    D2 --> T3[Tentative 3]
+    T3 -- Error --> F[Fail & Propagate]
+    
+    style F fill:#ffcdd2,stroke:#b71c1c
 ```
 
 ## 2. Observabilité "Zéro-Lib"

@@ -16,23 +16,27 @@ Ce projet est une implémentation de référence d'une architecture microservice
 
 ---
 
-##  Architecture du Système
+## 🏗 Architecture du Système
 La plateforme est composée de 5 services isolés communiquant via un réseau virtuel Docker.
 
-```text
-                    [ Client / test.sh ]
-                             |
-                    ┌────────▼────────┐
-                    │   API GATEWAY   │ :3005 (Host)
-                    │ (Rate Limiting) │
-                    └┬───────┬───────┬┘
-                     │       │       │
-      ┌──────────────▼─┐ ┌───▼────┐ ┌▼─────────────┐ ┌─────────────┐
-      │   CATALOGUE    │ │ PANIER │ │  COMMANDES   │ │NOTIFICATIONS│
-      │ (Inventory/Res)│ │ (Memory)│ │(Order Orch) │ │ (Email Sim) │
-      └────────────────┘ └────────┘ └──────┬───────┘ └──────▲──────┘
-                                           │                │
-                                           └────────────────┘
+```mermaid
+graph TD
+    Client((💻 User/Test)) -->|HTTP :3005| Gateway[<b>API Gateway</b><br/><i>Entry Point</i>]
+    
+    subgraph "Internal Docker Network"
+        Gateway -->|Routing| Catalogue[<b>Catalogue</b><br/><i>Products & Stock</i>]
+        Gateway -->|Routing| Panier[<b>Panier</b><br/><i>User Carts</i>]
+        Gateway -->|Routing| Commandes[<b>Commandes</b><br/><i>Checkout Logic</i>]
+        
+        Commandes -.->|Async Notify| Notifications[<b>Notifications</b><br/><i>Email Sim</i>]
+    end
+    
+    %% Styling
+    style Gateway fill:#f9f,stroke:#333,stroke-width:2px
+    style Catalogue fill:#e1f5fe,stroke:#01579b
+    style Panier fill:#e1f5fe,stroke:#01579b
+    style Commandes fill:#e1f5fe,stroke:#01579b
+    style Notifications fill:#f1f8e9,stroke:#33691e
 ```
 
 ### Flux de Requêtes
