@@ -78,6 +78,11 @@ Pour garantir l'envoi d'une notification (At-Least-Once delivery), deux approche
 ## 6. Mise en œuvre de l'Observabilité
 L'un des points forts de ce TP est l'implémentation de métriques "Zero-Dependency".
 
+### Flux Nominal et Interactions
+Le diagramme suivant détaille le cycle de vie d'une requête utilisateur à travers les différents services :
+
+![Diagramme de Séquence](images/diagrammedesequence.png)
+
 - **Prometheus** : Collecte les métriques exposées sur `/metrics`.
 - **Grafana** : Permet la visualisation de la santé globale.
 

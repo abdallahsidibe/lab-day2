@@ -35,6 +35,9 @@ La plateforme est composée de 5 services isolés communiquant via un réseau vi
                                            └────────────────┘
 ```
 
+### Flux de Requêtes
+![Diagramme de Séquence](images/diagrammedesequence.png)
+
 ---
 
 ##  Démarrage Rapide
